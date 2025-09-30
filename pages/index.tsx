@@ -56,17 +56,30 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (users.length > 0) {
-      localStorage.setItem("bnAlphaUsers", JSON.stringify(users));
-    }
+    localStorage.setItem("bnAlphaUsers", JSON.stringify(users));
   }, [users]);
 
   const addUser = () => {
     if (newUserName.trim()) {
+      const today = new Date();
+      const pointRecords: PointRecord[] = [];
+
+      for (let i = 15; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(today.getDate() - i);
+        pointRecords.push({
+          date: date.toISOString().split("T")[0],
+          balanceReward: 0,
+          tradeReward: 0,
+          activityPoints: 0,
+          claimCost: 0,
+        });
+      }
+
       const newUser: User = {
         id: Date.now().toString(),
         name: newUserName,
-        pointRecords: [],
+        pointRecords,
         costRecords: [],
         revenueRecords: [],
       };
@@ -457,6 +470,21 @@ export default function Home() {
               <Button
                 onClick={() => {
                   if (newDate && !getAllDates().includes(newDate)) {
+                    setUsers(
+                      users.map((user) => ({
+                        ...user,
+                        pointRecords: [
+                          ...user.pointRecords,
+                          {
+                            date: newDate,
+                            balanceReward: 0,
+                            tradeReward: 0,
+                            activityPoints: 0,
+                            claimCost: 0,
+                          },
+                        ],
+                      }))
+                    );
                     setNewDate(new Date().toISOString().split("T")[0]);
                   }
                 }}
@@ -593,7 +621,7 @@ export default function Home() {
                         <td className="p-0">
                           <input
                             type="number"
-                            className="w-10 h-8 px-1 text-center border-0 bg-transparent focus:bg-yellow-50"
+                            className="min-w-10 w-full h-8 px-1 text-center border-0 bg-transparent focus:bg-yellow-50"
                             value={record?.balanceReward || ""}
                             onChange={(e) =>
                               updatePointCell(
@@ -609,7 +637,7 @@ export default function Home() {
                         <td className="p-0">
                           <input
                             type="number"
-                            className="w-10 h-8 px-1 text-center border-0 bg-transparent focus:bg-yellow-50"
+                            className="min-w-10 w-full h-8 px-1 text-center border-0 bg-transparent focus:bg-yellow-50"
                             value={record?.tradeReward || ""}
                             onChange={(e) =>
                               updatePointCell(
@@ -625,7 +653,7 @@ export default function Home() {
                         <td className="p-0">
                           <input
                             type="number"
-                            className="w-10 h-8 px-1 text-center border-0 bg-transparent focus:bg-yellow-50"
+                            className="min-w-10 w-full h-8 px-1 text-center border-0 bg-transparent focus:bg-yellow-50"
                             value={record?.activityPoints || ""}
                             onChange={(e) =>
                               updatePointCell(
@@ -641,7 +669,7 @@ export default function Home() {
                         <td className="p-0">
                           <input
                             type="number"
-                            className="w-10 h-8 px-1 text-center border-0 bg-transparent focus:bg-yellow-50"
+                            className="min-w-10 w-full h-8 px-1 text-center border-0 bg-transparent focus:bg-yellow-50"
                             value={record?.claimCost || ""}
                             onChange={(e) =>
                               updatePointCell(
@@ -655,7 +683,7 @@ export default function Home() {
                           />
                         </td>
                         <td className="p-0 text-center bg-blue-50 font-semibold">
-                          <div className="w-10 h-8 flex items-center justify-center">
+                          <div className="min-w-10 w-full h-8 flex items-center justify-center">
                             <span
                               className={
                                 total > 0 ? "text-green-600" : total < 0 ? "text-red-600" : ""
@@ -669,7 +697,7 @@ export default function Home() {
                           <input
                             type="number"
                             step="0.01"
-                            className="w-10 h-8 px-1 text-center border-0 bg-transparent focus:bg-yellow-50"
+                            className="min-w-10 w-full h-8 px-1 text-center border-0 bg-transparent focus:bg-yellow-50"
                             value={costRecord?.fee || ""}
                             onChange={(e) =>
                               updateCostCell(user.id, date, Number(e.target.value) || 0)
@@ -681,7 +709,7 @@ export default function Home() {
                           <input
                             type="number"
                             step="0.01"
-                            className="w-10 h-8 px-1 text-center border-0 bg-transparent focus:bg-yellow-50"
+                            className="min-w-10 w-full h-8 px-1 text-center border-0 bg-transparent focus:bg-yellow-50"
                             value={revenueRecord?.amount || ""}
                             onChange={(e) =>
                               updateRevenueCell(user.id, date, Number(e.target.value) || 0)
