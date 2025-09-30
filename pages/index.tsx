@@ -10,36 +10,21 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Pencil, Trash2 } from "lucide-react";
 import React, { useEffect, useState } from "react";
-
-interface PointRecord {
-  date: string;
-  balanceReward: number;
-  tradeReward: number;
-  activityPoints: number;
-  claimCost: number;
-}
-
-interface CostRecord {
-  date: string;
-  fee: number;
-}
-
-interface RevenueRecord {
-  date: string;
-  amount: number;
-}
-
-interface User {
-  id: string;
-  name: string;
-  pointRecords: PointRecord[];
-  costRecords: CostRecord[];
-  revenueRecords: RevenueRecord[];
-}
+import { User, PointRecord } from "@/types";
+import { StatsCards } from "@/components/bnalpha/StatsCards";
+import { BatchUpdateDialog } from "@/components/bnalpha/BatchUpdateDialog";
+import {
+  getCurrentCyclePoints,
+  getTomorrowPreviewPoints,
+  calculateAllUsersPeriodStats,
+  calculateAllUsersTotal,
+  formatDate,
+  getAllDates,
+  exportToCSV,
+} from "@/lib/bnalpha-utils";
 
 export default function Home() {
   const [users, setUsers] = useState<User[]>([]);
