@@ -47,6 +47,17 @@ export default function Home() {
   const [newUserName, setNewUserName] = useState("");
   const [editingUserId, setEditingUserId] = useState<string>("");
   const [editingUserName, setEditingUserName] = useState("");
+  const [batchDialogOpen, setBatchDialogOpen] = useState(false);
+  const [batchDate, setBatchDate] = useState(new Date().toISOString().split("T")[0]);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [batchValues, setBatchValues] = useState({
+    balanceReward: 0,
+    tradeReward: 0,
+    activityPoints: 0,
+    claimCost: 0,
+    cost: 0,
+    revenue: 0,
+  });
 
   useEffect(() => {
     const savedUsers = localStorage.getItem("bnAlphaUsers");
@@ -113,6 +124,112 @@ export default function Home() {
   const cancelEditUser = () => {
     setEditingUserId("");
     setEditingUserName("");
+  };
+
+  const toggleUserSelection = (userId: string) => {
+    setSelectedUserIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
+  };
+
+  const toggleAllUsers = () => {
+    if (selectedUserIds.length === users.length) {
+      setSelectedUserIds([]);
+    } else {
+      setSelectedUserIds(users.map((u) => u.id));
+    }
+  };
+
+  const applyBatchUpdate = () => {
+    setUsers(
+      users.map((user) => {
+        if (!selectedUserIds.includes(user.id)) {
+          return user;
+        }
+        let updatedUser = { ...user };
+
+        const pointIndex = user.pointRecords.findIndex((r) => r.date === batchDate);
+        if (pointIndex >= 0) {
+          const updatedRecords = [...user.pointRecords];
+          updatedRecords[pointIndex] = {
+            date: batchDate,
+            balanceReward: batchValues.balanceReward,
+            tradeReward: batchValues.tradeReward,
+            activityPoints: batchValues.activityPoints,
+            claimCost: batchValues.claimCost,
+          };
+          updatedUser = { ...updatedUser, pointRecords: updatedRecords };
+        } else {
+          updatedUser = {
+            ...updatedUser,
+            pointRecords: [
+              ...user.pointRecords,
+              {
+                date: batchDate,
+                balanceReward: batchValues.balanceReward,
+                tradeReward: batchValues.tradeReward,
+                activityPoints: batchValues.activityPoints,
+                claimCost: batchValues.claimCost,
+              },
+            ],
+          };
+        }
+
+        const costIndex = user.costRecords.findIndex((r) => r.date === batchDate);
+        if (costIndex >= 0) {
+          const updatedRecords = [...updatedUser.costRecords];
+          updatedRecords[costIndex] = {
+            date: batchDate,
+            fee: batchValues.cost,
+          };
+          updatedUser = { ...updatedUser, costRecords: updatedRecords };
+        } else {
+          updatedUser = {
+            ...updatedUser,
+            costRecords: [
+              ...updatedUser.costRecords,
+              {
+                date: batchDate,
+                fee: batchValues.cost,
+              },
+            ],
+          };
+        }
+
+        const revenueIndex = user.revenueRecords.findIndex((r) => r.date === batchDate);
+        if (revenueIndex >= 0) {
+          const updatedRecords = [...updatedUser.revenueRecords];
+          updatedRecords[revenueIndex] = {
+            date: batchDate,
+            amount: batchValues.revenue,
+          };
+          updatedUser = { ...updatedUser, revenueRecords: updatedRecords };
+        } else {
+          updatedUser = {
+            ...updatedUser,
+            revenueRecords: [
+              ...updatedUser.revenueRecords,
+              {
+                date: batchDate,
+                amount: batchValues.revenue,
+              },
+            ],
+          };
+        }
+
+        return updatedUser;
+      })
+    );
+    setBatchDialogOpen(false);
+    setSelectedUserIds([]);
+    setBatchValues({
+      balanceReward: 0,
+      tradeReward: 0,
+      activityPoints: 0,
+      claimCost: 0,
+      cost: 0,
+      revenue: 0,
+    });
   };
 
   const getCurrentCyclePoints = (records: PointRecord[]) => {
@@ -456,6 +573,132 @@ export default function Home() {
           </AlertDialogContent>
         </AlertDialog>
 
+        <AlertDialog open={batchDialogOpen} onOpenChange={setBatchDialogOpen}>
+          <AlertDialogContent className="max-w-2xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>批量添加数据</AlertDialogTitle>
+              <AlertDialogDescription>
+                为所有用户添加相同的数据
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium mb-1 block">日期</label>
+                <Input
+                  type="text"
+                  placeholder="YYYY-MM-DD"
+                  value={batchDate}
+                  onChange={(e) => setBatchDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm font-medium">选择用户</label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleAllUsers}
+                    className="h-auto py-1 px-2"
+                  >
+                    {selectedUserIds.length === users.length ? "取消全选" : "全选"}
+                  </Button>
+                </div>
+                <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto border rounded p-2">
+                  {users.map((user) => (
+                    <label
+                      key={user.id}
+                      className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-1 rounded"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedUserIds.includes(user.id)}
+                        onChange={() => toggleUserSelection(user.id)}
+                        className="cursor-pointer"
+                      />
+                      <span className="text-sm">{user.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-2 block">积分数据</label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">余额</label>
+                    <Input
+                      type="number"
+                      value={batchValues.balanceReward}
+                      onChange={(e) =>
+                        setBatchValues({ ...batchValues, balanceReward: Number(e.target.value) })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">交易</label>
+                    <Input
+                      type="number"
+                      value={batchValues.tradeReward}
+                      onChange={(e) =>
+                        setBatchValues({ ...batchValues, tradeReward: Number(e.target.value) })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">活动</label>
+                    <Input
+                      type="number"
+                      value={batchValues.activityPoints}
+                      onChange={(e) =>
+                        setBatchValues({ ...batchValues, activityPoints: Number(e.target.value) })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">消耗</label>
+                    <Input
+                      type="number"
+                      value={batchValues.claimCost}
+                      onChange={(e) =>
+                        setBatchValues({ ...batchValues, claimCost: Number(e.target.value) })
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium mb-1 block">磨损 (USD)</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={batchValues.cost}
+                    onChange={(e) =>
+                      setBatchValues({ ...batchValues, cost: Number(e.target.value) })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">收益 (USD)</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={batchValues.revenue}
+                    onChange={(e) =>
+                      setBatchValues({ ...batchValues, revenue: Number(e.target.value) })
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel>取消</AlertDialogCancel>
+              <AlertDialogAction onClick={applyBatchUpdate} disabled={selectedUserIds.length === 0}>
+                应用到选中用户 ({selectedUserIds.length})
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         <div className="mb-4 flex flex-col w-full gap-2">
           <label className="text-sm font-medium mb-1 block">添加新日期</label>
 
@@ -493,6 +736,9 @@ export default function Home() {
               </Button>
             </div>
             <div className="flex gap-2 w-full lg:w-auto">
+              <Button onClick={() => setBatchDialogOpen(true)} variant="outline">
+                批量添加
+              </Button>
               <Button onClick={exportData} variant="outline">
                 导出数据
               </Button>
