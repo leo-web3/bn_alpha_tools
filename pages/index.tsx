@@ -744,7 +744,7 @@ export default function Home() {
                                   variant="ghost"
                                   size="icon"
                                   onClick={(e) => e.stopPropagation()}
-                                  className="h-5 w-5"
+                                  className="h-5 w-5 ml-auto"
                                   title="删除用户"
                                 >
                                   <Trash2 className="h-3 w-3 text-destructive" />
@@ -775,22 +775,22 @@ export default function Home() {
                         </div>
                       </div>
                     </td>
-                    <td className="p-0 text-center bg-blue-50 font-semibold">
+                    <td className="p-1 text-center bg-blue-50 font-semibold">
                       <div className="min-w-12 w-full h-8 flex items-center justify-center">
                         {getCurrentCyclePoints(user.pointRecords)}
                       </div>
                     </td>
-                    <td className="p-0 text-center bg-green-50 font-semibold">
+                    <td className="p-1 text-center bg-green-50 font-semibold">
                       <div className="min-w-12 w-full h-8 flex items-center justify-center">
                         {getTomorrowPreviewPoints(user.pointRecords) ?? "-"}
                       </div>
                     </td>
-                    <td className="p-0 text-center bg-red-50/50">
+                    <td className="p-1 text-center bg-red-50/50">
                       <div className="min-w-12 w-full h-8 flex items-center justify-center">
                         ${user.costRecords.reduce((sum, r) => sum + r.fee, 0).toFixed(2)}
                       </div>
                     </td>
-                    <td className="p-0 text-center bg-emerald-50/50 border-r">
+                    <td className="p-1 text-center bg-emerald-50/50 border-r">
                       <div className="min-w-12 w-full h-8 flex items-center justify-center">
                         ${user.revenueRecords.reduce((sum, r) => sum + r.amount, 0).toFixed(2)}
                       </div>
