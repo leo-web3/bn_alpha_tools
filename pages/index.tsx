@@ -10,28 +10,16 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Pencil, Trash2 } from "lucide-react";
+import { PointRecord, User } from "@/types";
+import { Trash2 } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { User, PointRecord } from "@/types";
-import { StatsCards } from "@/components/bnalpha/StatsCards";
-import { BatchUpdateDialog } from "@/components/bnalpha/BatchUpdateDialog";
-import {
-  getCurrentCyclePoints,
-  getTomorrowPreviewPoints,
-  calculateAllUsersPeriodStats,
-  calculateAllUsersTotal,
-  formatDate,
-  getAllDates,
-  exportToCSV,
-} from "@/lib/bnalpha-utils";
 
 export default function Home() {
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [newUserName, setNewUserName] = useState("");
-  const [editingUserId, setEditingUserId] = useState<string>("");
-  const [editingUserName, setEditingUserName] = useState("");
   const [batchDialogOpen, setBatchDialogOpen] = useState(false);
   const [batchDate, setBatchDate] = useState(new Date().toISOString().split("T")[0]);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
@@ -56,7 +44,14 @@ export default function Home() {
   }, [users]);
 
   const addUser = () => {
-    if (newUserName.trim()) {
+    const name = newUserName.trim();
+    if (name) {
+      // 重名校验（不允许同名）
+      const exists = users.some((u) => (u.name || "").trim() === name);
+      if (exists) {
+        alert("用户名已存在，请使用不同的名称");
+        return;
+      }
       const today = new Date();
       const pointRecords: PointRecord[] = [];
 
@@ -74,7 +69,7 @@ export default function Home() {
 
       const newUser: User = {
         id: Date.now().toString(),
-        name: newUserName,
+        name,
         pointRecords,
         costRecords: [],
         revenueRecords: [],
@@ -91,25 +86,7 @@ export default function Home() {
     }
   };
 
-  const startEditUser = (userId: string, userName: string) => {
-    setEditingUserId(userId);
-    setEditingUserName(userName);
-  };
-
-  const saveEditUser = () => {
-    if (editingUserName.trim() && editingUserId) {
-      setUsers(
-        users.map((u) => (u.id === editingUserId ? { ...u, name: editingUserName.trim() } : u))
-      );
-      setEditingUserId("");
-      setEditingUserName("");
-    }
-  };
-
-  const cancelEditUser = () => {
-    setEditingUserId("");
-    setEditingUserName("");
-  };
+  // 已移除用户名弹窗编辑逻辑，改为行内可编辑
 
   const toggleUserSelection = (userId: string) => {
     setSelectedUserIds((prev) =>
@@ -363,46 +340,18 @@ export default function Home() {
   const [newDate, setNewDate] = useState(new Date().toISOString().split("T")[0]);
 
   const exportData = () => {
-    const allDates = getAllDates();
-    let csvContent = "\uFEFF";
-
-    csvContent += "日期,";
-    users.forEach((user) => {
-      csvContent += `${user.name}-余额,${user.name}-交易,${user.name}-活动,${user.name}-消耗,${user.name}-积分合计,${user.name}-磨损,${user.name}-收益,`;
-    });
-    csvContent += "\n";
-
-    allDates.forEach((date) => {
-      csvContent += `${date},`;
-      users.forEach((user) => {
-        const pointRecord = user.pointRecords.find((r) => r.date === date);
-        const costRecord = user.costRecords.find((r) => r.date === date);
-        const revenueRecord = user.revenueRecords.find((r) => r.date === date);
-        const total = pointRecord
-          ? pointRecord.balanceReward +
-            pointRecord.tradeReward +
-            pointRecord.activityPoints -
-            pointRecord.claimCost
-          : 0;
-
-        csvContent += `${pointRecord?.balanceReward || 0},`;
-        csvContent += `${pointRecord?.tradeReward || 0},`;
-        csvContent += `${pointRecord?.activityPoints || 0},`;
-        csvContent += `${pointRecord?.claimCost || 0},`;
-        csvContent += `${total},`;
-        csvContent += `${costRecord?.fee || 0},`;
-        csvContent += `${revenueRecord?.amount || 0},`;
-      });
-      csvContent += "\n";
-    });
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `bn_alpha_data_${new Date().toISOString().split("T")[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    try {
+      const json = JSON.stringify(users, null, 2);
+      const blob = new Blob([json], { type: "application/json;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `bn_alpha_data_${new Date().toISOString().split("T")[0]}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert("导出失败");
+    }
   };
 
   const importData = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -539,32 +488,13 @@ export default function Home() {
           <Button onClick={addUser}>添加用户</Button>
         </div>
 
-        <AlertDialog open={!!editingUserId} onOpenChange={(open) => !open && cancelEditUser()}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>编辑用户名</AlertDialogTitle>
-              <AlertDialogDescription>修改用户名称</AlertDialogDescription>
-            </AlertDialogHeader>
-            <Input
-              value={editingUserName}
-              onChange={(e) => setEditingUserName(e.target.value)}
-              placeholder="输入新用户名"
-              onKeyPress={(e) => e.key === "Enter" && saveEditUser()}
-            />
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={cancelEditUser}>取消</AlertDialogCancel>
-              <AlertDialogAction onClick={saveEditUser}>保存</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        {/* 用户名弹窗编辑已移除，采用行内可编辑 */}
 
         <AlertDialog open={batchDialogOpen} onOpenChange={setBatchDialogOpen}>
           <AlertDialogContent className="max-w-2xl">
             <AlertDialogHeader>
               <AlertDialogTitle>批量添加数据</AlertDialogTitle>
-              <AlertDialogDescription>
-                为所有用户添加相同的数据
-              </AlertDialogDescription>
+              <AlertDialogDescription>为所有用户添加相同的数据</AlertDialogDescription>
             </AlertDialogHeader>
             <div className="space-y-4">
               <div>
@@ -736,226 +666,255 @@ export default function Home() {
             </div>
           </div>
         </div>
-
-        <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
-          <table className="w-full text-xs border-collapse">
-            <thead>
-              <tr className="border-b">
-                <th className="p-2 text-left sticky left-0 bg-white border-r font-medium shadow-[2px_0_5px_rgba(0,0,0,0.1)] z-10">
-                  日期
-                </th>
+        {getAllDates().length > 0 && (
+          <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="border-b">
+                  <th className="p-2 text-left sticky left-0 bg-white border-r font-medium shadow-[2px_0_5px_rgba(0,0,0,0.1)] z-10">
+                    用户
+                  </th>
+                  <th className="p-2 text-center border-r font-medium" colSpan={4}>
+                    汇总
+                  </th>
+                  {getAllDates().map((date) => (
+                    <th key={date} colSpan={7} className="p-2 text-center border-r">
+                      {formatDate(date)}
+                    </th>
+                  ))}
+                </tr>
+                <tr className="border-b bg-muted/30">
+                  <th className="p-2 sticky left-0 bg-white border-r shadow-[2px_0_5px_rgba(0,0,0,0.1)] z-10">
+                    名字
+                  </th>
+                  <th className="p-1 text-center text-[10px] bg-blue-50">现积分</th>
+                  <th className="p-1 text-center text-[10px] bg-green-50">明天</th>
+                  <th className="p-1 text-center text-[10px] bg-red-50">总磨损</th>
+                  <th className="p-1 text-center text-[10px] border-r bg-emerald-50">总收益</th>
+                  {getAllDates().map((date) => (
+                    <React.Fragment key={date}>
+                      <th className="p-1 text-center text-[10px]">余额</th>
+                      <th className="p-1 text-center text-[10px]">交易</th>
+                      <th className="p-1 text-center text-[10px]">活动</th>
+                      <th className="p-1 text-center text-[10px]">消耗</th>
+                      <th className="p-1 text-center text-[10px] bg-blue-50">合计</th>
+                      <th className="p-1 text-center text-[10px] bg-red-50">磨损</th>
+                      <th className="p-1 text-center text-[10px] border-r bg-green-50">收益</th>
+                    </React.Fragment>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
                 {users.map((user) => (
-                  <th key={user.id} colSpan={7} className="p-2 text-center border-r">
-                    <div className="flex items-center justify-center gap-1 mb-1">
-                      <span className="font-medium">{user.name}</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          startEditUser(user.id, user.name);
-                        }}
-                        className="h-5 w-5"
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => e.stopPropagation()}
-                            className="h-5 w-5"
-                          >
-                            <Trash2 className="h-3 w-3 text-destructive" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>确认删除</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              确定要删除用户 &quot;{user.name}&quot;
-                              吗？此操作将删除该用户的所有数据且无法恢复。
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>取消</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteUser(user.id);
+                  <tr key={user.id} className="border-b hover:bg-muted/20">
+                    <td
+                      className="p-2 sticky left-0 border-r whitespace-nowrap shadow-[2px_0_5px_rgba(0,0,0,0.1)] z-10 align-top"
+                      style={{ backgroundColor: "hsl(var(--background))" }}
+                    >
+                      <div className="flex items-start gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1">
+                            <span
+                              contentEditable
+                              suppressContentEditableWarning
+                              className="px-1 rounded hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
+                              title="点击编辑用户名"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  (e.target as HTMLSpanElement).blur();
+                                }
+                              }}
+                              onBlur={(e) => {
+                                const text = e.currentTarget.textContent?.trim() || "";
+                                setUsers(
+                                  users.map((u) =>
+                                    u.id === user.id ? { ...u, name: text || u.name } : u
+                                  )
+                                );
+                                // ensure UI shows trimmed value
+                                e.currentTarget.textContent = text || user.name;
                               }}
                             >
-                              删除
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                    <div className="text-xs font-semibold flex flex-col gap-0.5">
-                      <div>
-                        <span className="text-blue-600">
-                          积分: {getCurrentCyclePoints(user.pointRecords)}
-                        </span>
-                        {getTomorrowPreviewPoints(user.pointRecords) !== null && (
-                          <span className="text-green-600 ml-2">
-                            明天: {getTomorrowPreviewPoints(user.pointRecords)}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex gap-2 justify-center">
-                        <span className="text-red-600">
-                          磨损: ${user.costRecords.reduce((sum, r) => sum + r.fee, 0).toFixed(2)}
-                        </span>
-                        <span className="text-green-600">
-                          收益: $
-                          {user.revenueRecords.reduce((sum, r) => sum + r.amount, 0).toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                  </th>
-                ))}
-              </tr>
-              <tr className="border-b bg-muted/30">
-                <th className="p-2 sticky left-0 bg-white shadow-[2px_0_5px_rgba(0,0,0,0.1)] z-10"></th>
-                {users.map((user) => (
-                  <React.Fragment key={user.id}>
-                    <th className="p-1 text-center text-[10px]">余额</th>
-                    <th className="p-1 text-center text-[10px]">交易</th>
-                    <th className="p-1 text-center text-[10px]">活动</th>
-                    <th className="p-1 text-center text-[10px]">消耗</th>
-                    <th className="p-1 text-center text-[10px] bg-blue-50">合计</th>
-                    <th className="p-1 text-center text-[10px] bg-red-50">磨损</th>
-                    <th className="p-1 text-center text-[10px] border-r bg-green-50">收益</th>
-                  </React.Fragment>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {getAllDates().map((date) => (
-                <tr key={date} className="border-b hover:bg-muted/20">
-                  <td className="p-2 sticky left-0 bg-white border-r font-medium whitespace-nowrap shadow-[2px_0_5px_rgba(0,0,0,0.1)] z-10">
-                    {formatDate(date)}
-                  </td>
-                  {users.map((user) => {
-                    const record = user.pointRecords.find((r) => r.date === date);
-                    const costRecord = user.costRecords.find((r) => r.date === date);
-                    const revenueRecord = user.revenueRecords.find((r) => r.date === date);
-                    const total = record
-                      ? record.balanceReward +
-                        record.tradeReward +
-                        record.activityPoints -
-                        record.claimCost
-                      : 0;
-                    return (
-                      <React.Fragment key={user.id}>
-                        <td className="p-0">
-                          <input
-                            type="number"
-                            className="min-w-10 w-full h-8 px-1 text-center border-0 bg-transparent focus:bg-yellow-50"
-                            value={record?.balanceReward || ""}
-                            onChange={(e) =>
-                              updatePointCell(
-                                user.id,
-                                date,
-                                "balanceReward",
-                                Number(e.target.value) || 0
-                              )
-                            }
-                            placeholder="0"
-                          />
-                        </td>
-                        <td className="p-0">
-                          <input
-                            type="number"
-                            className="min-w-10 w-full h-8 px-1 text-center border-0 bg-transparent focus:bg-yellow-50"
-                            value={record?.tradeReward || ""}
-                            onChange={(e) =>
-                              updatePointCell(
-                                user.id,
-                                date,
-                                "tradeReward",
-                                Number(e.target.value) || 0
-                              )
-                            }
-                            placeholder="0"
-                          />
-                        </td>
-                        <td className="p-0">
-                          <input
-                            type="number"
-                            className="min-w-10 w-full h-8 px-1 text-center border-0 bg-transparent focus:bg-yellow-50"
-                            value={record?.activityPoints || ""}
-                            onChange={(e) =>
-                              updatePointCell(
-                                user.id,
-                                date,
-                                "activityPoints",
-                                Number(e.target.value) || 0
-                              )
-                            }
-                            placeholder="0"
-                          />
-                        </td>
-                        <td className="p-0">
-                          <input
-                            type="number"
-                            className="min-w-10 w-full h-8 px-1 text-center border-0 bg-transparent focus:bg-yellow-50"
-                            value={record?.claimCost || ""}
-                            onChange={(e) =>
-                              updatePointCell(
-                                user.id,
-                                date,
-                                "claimCost",
-                                Number(e.target.value) || 0
-                              )
-                            }
-                            placeholder="0"
-                          />
-                        </td>
-                        <td className="p-0 text-center bg-blue-50 font-semibold">
-                          <div className="min-w-10 w-full h-8 flex items-center justify-center">
-                            <span
-                              className={
-                                total > 0 ? "text-green-600" : total < 0 ? "text-red-600" : ""
-                              }
-                            >
-                              {total}
+                              {user.name}
                             </span>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="h-5 w-5"
+                                  title="删除用户"
+                                >
+                                  <Trash2 className="h-3 w-3 text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>确认删除</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    确定要删除用户 &quot;{user.name}&quot;
+                                    吗？此操作将删除该用户的所有数据且无法恢复。
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>取消</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      deleteUser(user.id);
+                                    }}
+                                  >
+                                    删除
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </div>
-                        </td>
-                        <td className="p-0 bg-red-50/30">
-                          <input
-                            type="number"
-                            step="0.01"
-                            className="min-w-10 w-full h-8 px-1 text-center border-0 bg-transparent focus:bg-yellow-50"
-                            value={costRecord?.fee || ""}
-                            onChange={(e) =>
-                              updateCostCell(user.id, date, Number(e.target.value) || 0)
-                            }
-                            placeholder="0.00"
-                          />
-                        </td>
-                        <td className="p-0 border-r bg-green-50/30">
-                          <input
-                            type="number"
-                            step="0.01"
-                            className="min-w-10 w-full h-8 px-1 text-center border-0 bg-transparent focus:bg-yellow-50"
-                            value={revenueRecord?.amount || ""}
-                            onChange={(e) =>
-                              updateRevenueCell(user.id, date, Number(e.target.value) || 0)
-                            }
-                            placeholder="0.00"
-                          />
-                        </td>
-                      </React.Fragment>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-0 text-center bg-blue-50 font-semibold">
+                      <div className="min-w-12 w-full h-8 flex items-center justify-center">
+                        {getCurrentCyclePoints(user.pointRecords)}
+                      </div>
+                    </td>
+                    <td className="p-0 text-center bg-green-50 font-semibold">
+                      <div className="min-w-12 w-full h-8 flex items-center justify-center">
+                        {getTomorrowPreviewPoints(user.pointRecords) ?? "-"}
+                      </div>
+                    </td>
+                    <td className="p-0 text-center bg-red-50/50">
+                      <div className="min-w-12 w-full h-8 flex items-center justify-center">
+                        ${user.costRecords.reduce((sum, r) => sum + r.fee, 0).toFixed(2)}
+                      </div>
+                    </td>
+                    <td className="p-0 text-center bg-emerald-50/50 border-r">
+                      <div className="min-w-12 w-full h-8 flex items-center justify-center">
+                        ${user.revenueRecords.reduce((sum, r) => sum + r.amount, 0).toFixed(2)}
+                      </div>
+                    </td>
+                    {getAllDates().map((date) => {
+                      const record = user.pointRecords.find((r) => r.date === date);
+                      const costRecord = user.costRecords.find((r) => r.date === date);
+                      const revenueRecord = user.revenueRecords.find((r) => r.date === date);
+                      const total = record
+                        ? record.balanceReward +
+                          record.tradeReward +
+                          record.activityPoints -
+                          record.claimCost
+                        : 0;
+                      return (
+                        <React.Fragment key={date}>
+                          <td className="p-0">
+                            <input
+                              type="number"
+                              className="min-w-10 w-full h-8 px-1 text-center border-0 bg-transparent focus:bg-yellow-50"
+                              value={record?.balanceReward || ""}
+                              onChange={(e) =>
+                                updatePointCell(
+                                  user.id,
+                                  date,
+                                  "balanceReward",
+                                  Number(e.target.value) || 0
+                                )
+                              }
+                              placeholder="0"
+                            />
+                          </td>
+                          <td className="p-0">
+                            <input
+                              type="number"
+                              className="min-w-10 w-full h-8 px-1 text-center border-0 bg-transparent focus:bg-yellow-50"
+                              value={record?.tradeReward || ""}
+                              onChange={(e) =>
+                                updatePointCell(
+                                  user.id,
+                                  date,
+                                  "tradeReward",
+                                  Number(e.target.value) || 0
+                                )
+                              }
+                              placeholder="0"
+                            />
+                          </td>
+                          <td className="p-0">
+                            <input
+                              type="number"
+                              className="min-w-10 w-full h-8 px-1 text-center border-0 bg-transparent focus:bg-yellow-50"
+                              value={record?.activityPoints || ""}
+                              onChange={(e) =>
+                                updatePointCell(
+                                  user.id,
+                                  date,
+                                  "activityPoints",
+                                  Number(e.target.value) || 0
+                                )
+                              }
+                              placeholder="0"
+                            />
+                          </td>
+                          <td className="p-0">
+                            <input
+                              type="number"
+                              className="min-w-10 w-full h-8 px-1 text-center border-0 bg-transparent focus:bg-yellow-50"
+                              value={record?.claimCost || ""}
+                              onChange={(e) =>
+                                updatePointCell(
+                                  user.id,
+                                  date,
+                                  "claimCost",
+                                  Number(e.target.value) || 0
+                                )
+                              }
+                              placeholder="0"
+                            />
+                          </td>
+                          <td className="p-0 text-center bg-blue-50 font-semibold">
+                            <div className="min-w-10 w-full h-8 flex items-center justify-center">
+                              <span
+                                className={
+                                  total > 0 ? "text-green-600" : total < 0 ? "text-red-600" : ""
+                                }
+                              >
+                                {total}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="p-0 bg-red-50/30">
+                            <input
+                              type="number"
+                              step="0.01"
+                              className="min-w-10 w-full h-8 px-1 text-center border-0 bg-transparent focus:bg-yellow-50"
+                              value={costRecord?.fee || ""}
+                              onChange={(e) =>
+                                updateCostCell(user.id, date, Number(e.target.value) || 0)
+                              }
+                              placeholder="0.00"
+                            />
+                          </td>
+                          <td className="p-0 border-r bg-green-50/30">
+                            <input
+                              type="number"
+                              step="0.01"
+                              className="min-w-10 w-full h-8 px-1 text-center border-0 bg-transparent focus:bg-yellow-50"
+                              value={revenueRecord?.amount || ""}
+                              onChange={(e) =>
+                                updateRevenueCell(user.id, date, Number(e.target.value) || 0)
+                              }
+                              placeholder="0.00"
+                            />
+                          </td>
+                        </React.Fragment>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
