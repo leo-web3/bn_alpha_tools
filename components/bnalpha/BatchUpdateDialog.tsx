@@ -29,7 +29,14 @@ interface BatchUpdateDialogProps {
     cost: number;
     revenue: number;
   };
-  setBatchValues: (values: any) => void;
+  setBatchValues: (values: {
+    balanceReward: number;
+    tradeReward: number;
+    activityPoints: number;
+    claimCost: number;
+    cost: number;
+    revenue: number;
+  }) => void;
   onApply: () => void;
 }
 
